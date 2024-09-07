@@ -55,11 +55,11 @@ Run the model to start training:
 python ./DeepCA/train_models/train_model.py 
 ```
 
-# 4. License
+# 5. License
 
 Please see [license](https://github.com/WangStephen/DeepCA/blob/main/LICENSE).
 
-# 5. Acknowledgement
+# 6. Acknowledgement
 
 DeepCA model architectures are revised based on [Compact Transformers](https://github.com/SHI-Labs/Compact-Transformers) and [Dynamic Snake Convolution](https://github.com/YaoleiQi/DSCNet).
 
