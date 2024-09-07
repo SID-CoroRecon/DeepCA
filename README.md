@@ -24,7 +24,7 @@ Cardiovascular diseases (CVDs) are the most common cause of death worldwide. Inv
 ## Our Proposed Pipeline
 
 <p align="center">
-  <img src="https://github.com/WangStephen/DeepCA/blob/main/img/workflow.pdf" width="1200" height="600">
+  <img src="https://github.com/WangStephen/DeepCA/blob/main/img/workflow.png" width="1200" height="600">
 </p>
 
 # 3. Packages Requirement
