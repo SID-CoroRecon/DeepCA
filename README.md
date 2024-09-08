@@ -65,6 +65,8 @@ Run the model to start training:
 python ./DeepCA/train_models/train_model.py 
 ```
 
+Once finished, the model trained on simulated CCTA projections can then be generalised to real clinical non-simultaneous ICA data for 3D coronary artery tree reconstruction. 
+
 # 5. License
 
 Please see [license](https://github.com/WangStephen/DeepCA/blob/main/LICENSE).
