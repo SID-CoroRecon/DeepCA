@@ -23,8 +23,18 @@ Cardiovascular diseases (CVDs) are the most common cause of death worldwide. Inv
 
 ## Our Proposed Pipeline
 
+Our proposed DeepCA method consists of two blocks: a data preprocessing block and a 3D reconstruction with motion compensation block. In the data preprocessing block, we generate two simulated ICA projections based on 3D CCTA data, with simulated motion on the second projection plane, and then apply backprojection on them to produce the input to the DeepCA model at the next block. In the 3D reconstruction with motion compensation block, we map the 3D backprojection input to the CCTA data for 3D coronary artery tree reconstruction via training a deep neural network, implicitly compensating for any motion.
+
 <p align="center">
   <img src="https://github.com/WangStephen/DeepCA/blob/main/img/workflow.png">
+</p>
+
+## Our Proposed Model
+
+Our DeepCA model architecture is based on the Wasserstein conditional generative adversarial network with gradient penalty, latent convolutional transformer layers, and a dynamic snake convolutional critic. Via mapping the input with non-aligned projections to 3D coronary tree data, most motion artifacts are corrected by our model. With the critic used, any residual uncorrected deformations are adjusted, while ensuring the connectedness of the coronary tree structures in the reconstructions and increasing the model's elastic generalisation capacity. So when generalising to real non-simultaneous ICA projections, the non-rigid motion is compensated implicitly.
+
+<p align="center">
+  <img src="https://github.com/WangStephen/DeepCA/blob/main/img/model.png">
 </p>
 
 # 3. Packages Requirement
