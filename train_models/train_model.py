@@ -8,7 +8,6 @@ import numpy as np
 import random
 import copy
 import gc
-import wandb
 import os
 import sys
 from torch.amp import autocast, GradScaler
@@ -35,17 +34,6 @@ SAMPLES_PARA = get_samples_parameters(data_path)
 LEARNING_RATE = 1e-4
 MAX_EPOCHS = 200
 BATCH_SIZE = 3
-
-# Initialize wandb
-wandb.init(
-    project="DeepCA",
-    config={
-        "learning_rate": LEARNING_RATE,
-        "max_epochs": MAX_EPOCHS,
-        "batch_size": BATCH_SIZE,
-        "architecture": "WCGAN+GP"
-    }
-)
 
 def set_random_seed(seed, deterministic=True):
     """Set random seed.
@@ -129,10 +117,6 @@ def main():
     # Initialize gradient scaler for mixed precision training
     scaler = GradScaler()
 
-    # Log model architectures
-    wandb.watch(model, log="all")
-    wandb.watch(discriminator, log="all")
-
     batch_size = BATCH_SIZE
 
     #Dataset setup
@@ -148,20 +132,18 @@ def main():
     #G and D optimizer
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.9))
     D_optimizer = optim.Adam(discriminator.parameters(), 
-                                    lr=1e-4, betas=(0.5, 0.9))
+                                    lr=LEARNING_RATE, betas=(0.5, 0.9))
 
-    #
     best_validation_loss = np.Inf
-
     best_model_state = None
     best_D_model_state = None
-
     early_stop_count_val = 0
-    one = torch.tensor(1, dtype=torch.float).to(device)
-    mone = one * (-1)
-    num_train_divide = np.floor(SAMPLES_PARA["num_train_data"]/batch_size)
     num_critics = 2
-    for epoch in tqdm(range(MAX_EPOCHS)):
+
+    # Create progress bar for epochs
+    epoch_pbar = tqdm(range(MAX_EPOCHS), desc='Training Progress', position=0)
+    
+    for epoch in epoch_pbar:
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -175,7 +157,11 @@ def main():
         Wasserstein_Ds = []
         Wasserstein_Ds_cur= []
 
-        for i, data in tqdm(enumerate(trainloader), total=len(trainloader)):
+        # Create progress bar for batches
+        batch_pbar = tqdm(enumerate(trainloader), total=len(trainloader), 
+                         desc=f'Epoch {epoch+1}/{MAX_EPOCHS}', position=1, leave=False)
+
+        for i, data in batch_pbar:
             torch.cuda.empty_cache()
 
             # get the inputs; data is a list of [inputs, labels]
@@ -240,18 +226,13 @@ def main():
                 l1_losses.append(l1_loss.detach().item())
                 combined_losses.append(combined_loss.detach().item())
 
-                # Replace TensorBoard logging with wandb
-                wandb.log({
-                    'Loss_iter/l1_3d': l1_loss.detach(),
-                    'Loss_iter/G_loss': G_loss.detach(),
-                    'Loss_iter/D_loss': np.mean(D_losses_cur),
-                    'Loss_iter/Wasserstein_D': np.mean(Wasserstein_Ds_cur),
-                    'Loss_iter/combined_loss': combined_loss.detach(),
-                    'Loss_iter/G_D_loss': {
-                        'G_loss': G_loss.detach(),
-                        'D_loss': np.mean(D_losses_cur)
-                    }
-                }, step=epoch*num_train_divide+i+1)
+                # Update batch progress bar with current metrics
+                batch_pbar.set_postfix({
+                    'D_loss': f'{np.mean(D_losses_cur):.4f}',
+                    'G_loss': f'{G_loss.detach().item():.4f}',
+                    'L1_loss': f'{l1_loss.detach().item():.4f}',
+                    'W_D': f'{np.mean(Wasserstein_Ds_cur):.4f}'
+                })
 
                 D_losses_cur = []
                 Wasserstein_Ds_cur = []
@@ -267,37 +248,14 @@ def main():
         combined_loss_val = G_loss_val + l1_loss_val*100
         validation_loss = l1_loss_val
 
-        # Print epoch progress and losses
-        print(f'Epoch {epoch+1}/{MAX_EPOCHS}, D_loss: {np.mean(D_losses):.4f}, 
-              W_D: {np.mean(Wasserstein_Ds):.4f}, G_loss: {np.mean(G_losses):.4f}, l1_loss: {np.mean(l1_losses):.4f}')
-
-        # Replace TensorBoard logging with wandb
-        wandb.log({
-            'Loss/train': np.mean(Wasserstein_Ds),
-            'Loss/l1_3d': np.mean(l1_losses),
-            'Loss/D_loss': np.mean(D_losses),
-            'Loss/G_loss': np.mean(G_losses),
-            'Loss/combined_losses': np.mean(combined_losses),
-            'Loss/l1_3d_val': l1_loss_val,
-            'Loss/G_loss_val': G_loss_val,
-            'Loss/combined_losses_val': combined_loss_val,
-            'Loss/l1_3d_tv': {
-                'train': np.mean(l1_losses),
-                'validation': l1_loss_val
-            },
-            'Loss/G_loss_tv': {
-                'train': np.mean(G_losses),
-                'validation': G_loss_val
-            },
-            'Loss/combined_losses_tv': {
-                'train': np.mean(combined_losses),
-                'validation': combined_loss_val
-            },
-            'Loss/G_D_loss': {
-                'G_loss': np.mean(G_losses),
-                'D_loss': np.mean(D_losses)
-            }
-        }, step=epoch+1)
+        # Update epoch progress bar with validation metrics
+        epoch_pbar.set_postfix({
+            'Val_L1': f'{l1_loss_val:.4f}',
+            'Val_G': f'{G_loss_val:.4f}',
+            'Train_D': f'{np.mean(D_losses):.4f}',
+            'Train_G': f'{np.mean(G_losses):.4f}',
+            'Train_L1': f'{np.mean(l1_losses):.4f}'
+        })
 
         if (epoch + 1) % 1 == 0:
             model.eval()
@@ -315,38 +273,26 @@ def main():
         if validation_loss < best_validation_loss:
             best_validation_loss = validation_loss
             early_stop_count_val = 0
-
-            # # Save a checkpoint of the best validation loss model so far
-            # # print("saving this best validation loss model so far!")
             best_model_state = copy.deepcopy(model.state_dict())
             best_D_model_state = copy.deepcopy(discriminator.state_dict())
         else:
             early_stop_count_val += 1
-            # print('no improvement on validation at this epoch, continue training...')
 
         if early_stop_count_val >= 20:
-            print('early stopping validation!!!')
+            print('\nEarly stopping triggered!')
             break
             
     # evaluate on test set
-    print('\n############################### testing evaluation on best trained model so far')
+    print('\n############################### Testing evaluation on best trained model')
     model.load_state_dict(best_model_state)
     discriminator.load_state_dict(best_D_model_state)
     G_loss_test, l1_loss_test = do_evaluation(testloader, model, device, discriminator)
     test_loss = G_loss_test + l1_loss_test*100
 
-    print('Testdataset Evaluation - test loss: {0:3.8f}, G loss: {1:3.8f}, l1 loss: {2:3.8f}'
-                .format(test_loss, G_loss_test.item(), l1_loss_test.item()))
-
-    # Log final test results
-    wandb.log({
-        'test/loss': test_loss,
-        'test/G_loss': G_loss_test.item(),
-        'test/l1_loss': l1_loss_test.item()
-    })
-
-    # Close wandb run
-    wandb.finish()
+    print('Test Results:')
+    print(f'Test Loss: {test_loss:.8f}')
+    print(f'G Loss: {G_loss_test:.8f}')
+    print(f'L1 Loss: {l1_loss_test:.8f}')
 
 if __name__ == '__main__':
     set_random_seed(1, False)
