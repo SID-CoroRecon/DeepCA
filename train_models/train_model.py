@@ -72,15 +72,18 @@ def calculate_gradient_penalty(real_images, fake_images, discriminator, device, 
                                prob_interpolated.size()).to(device),
                            create_graph=True, retain_graph=True)[0]
 
+    # Add epsilon to prevent division by zero
+    epsilon = 1e-8
     lambda_term = 10
-    grad_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * lambda_term
+    # Add epsilon to the norm calculation
+    grad_penalty = ((torch.sqrt(gradients.norm(2, dim=1) ** 2 + epsilon) - 1) ** 2).mean() * lambda_term
     return grad_penalty
 
-def generation_eval(outputs,labels):
-    l1_criterion = nn.L1Loss() #nn.MSELoss()
-
+def generation_eval(outputs, labels):
+    l1_criterion = nn.L1Loss()
+    # Add epsilon to prevent NaN
+    outputs = torch.clamp(outputs, min=-1.0, max=1.0)
     l1_loss = l1_criterion(outputs, labels)
-
     return l1_loss
 
 def do_evaluation(dataloader, model, device, discriminator):
@@ -118,6 +121,9 @@ def main():
 
     # Initialize gradient scaler for mixed precision training
     scaler = GradScaler()
+
+    # Add gradient clipping value
+    max_grad_norm = 1.0
 
     batch_size = BATCH_SIZE
 
@@ -192,6 +198,9 @@ def main():
                 Wasserstein_D = DX_score - DG_score
 
             scaler.scale(D_loss).backward()
+            # Add gradient clipping for discriminator
+            scaler.unscale_(D_optimizer)
+            torch.nn.utils.clip_grad_norm_(discriminator.parameters(), max_grad_norm)
             scaler.step(D_optimizer)
             scaler.update()
 
@@ -218,9 +227,13 @@ def main():
                     DG_score = discriminator(torch.cat((inputs, outputs), 1)).mean() # D(G(z))
                     G_loss = -DG_score
                     l1_loss = generation_eval(outputs,labels)
-                    combined_loss = G_loss + l1_loss*100
+                    # Reduce L1 loss weight to prevent dominance
+                    combined_loss = G_loss + l1_loss*10  # Changed from 100 to 10
 
                 scaler.scale(combined_loss).backward()
+                # Add gradient clipping for generator
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
                 scaler.step(optimizer)
                 scaler.update()
 

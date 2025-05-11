@@ -3,9 +3,9 @@ import torch.nn as nn
 from torch import cat
 
 try:
-      from .DSConv import DCN_Conv
+    from .DSConv import DCN_Conv
 except:
-      from DSConv import DCN_Conv
+    from DSConv import DCN_Conv
 
 class Discriminator(torch.nn.Module):
     def __init__(self, device, channels=1):

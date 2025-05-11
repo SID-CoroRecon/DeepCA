@@ -2,9 +2,9 @@ from torch import nn
 from torch import cat
 
 try:
-      from .CCT_3d import CCT
+    from .CCT_3d import CCT
 except:
-      from CCT_3d import CCT
+    from CCT_3d import CCT
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, batch_norm=True):
