@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import torch
-from torch import nn, cat
+from torch import nn
 
 
 class Conv(nn.Module):

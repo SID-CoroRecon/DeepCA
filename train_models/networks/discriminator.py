@@ -2,10 +2,13 @@ import torch
 import torch.nn as nn
 from torch import cat
 
-from DSConv import DCN_Conv
+try:
+      from .DSConv import DCN_Conv
+except:
+      from DSConv import DCN_Conv
 
 class Discriminator(torch.nn.Module):
-    def __init__(self, device, channels=1, dim=128):
+    def __init__(self, device, channels=1):
         super().__init__()
         self.pre_module = nn.Sequential(
             nn.Conv3d(in_channels=channels, out_channels=64, kernel_size=4, stride=2, padding=1),
@@ -33,7 +36,6 @@ class Discriminator(torch.nn.Module):
             nn.Conv3d(in_channels=256, out_channels=1, kernel_size=4, stride=1, padding=0),
             nn.Tanh())
 
-
     def forward(self, x):
         xx = self.pre_module(x)
         x = self.pool(x)
@@ -48,3 +50,21 @@ class Discriminator(torch.nn.Module):
     def feature_extraction(self, x):
         x = self.main_module(x)
         return x.view(-1, 1024*4*4)
+
+    def print_parameter_counts(self):
+        """Print the number of parameters in the model"""
+        total_params = sum(p.numel() for p in self.parameters())
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        non_trainable_params = total_params - trainable_params
+        
+        print("\nDiscriminator Parameter Counts:")
+        print(f"Total parameters: {total_params:,}")
+        print(f"Trainable parameters: {trainable_params:,}")
+        print(f"Non-trainable parameters: {non_trainable_params:,}")
+        print(f"Memory savings: {(non_trainable_params/total_params)*100:.2f}%")
+
+
+if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    discriminator = Discriminator(device)
+    discriminator.print_parameter_counts()

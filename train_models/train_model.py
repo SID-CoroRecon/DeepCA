@@ -14,26 +14,26 @@ from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 
 # Add current directory to path for imports
-sys.path.append('')     # TODO: change this to the path of the project
+sys.path.append(r'D:\AI\Internships\SID Research\models\DeepCA')     # TODO: change this to the path of the project
 
-from generator import Generator
-from discriminator import Discriminator
+from networks.generator import Generator
+from networks.discriminator import Discriminator
 from load_volume_data_RCA import Dataset
 from samples_parameters import get_samples_parameters
 
-# Kaggle paths
-data_path = ''  # TODO: change this to the path of the data
-output_dir = ''  # TODO: change this to the path of the project
+output_dir = r'D:\AI\Internships\SID Research\models\DeepCA\outputs_results'  # TODO: change this to the path of the project
+label_dir = r'D:\AI\Internships\SID Research\models\DeepCA\datasets\CCTA_GT'     # TODO: change this to the path of the data
+BP_dir = r'D:\AI\Internships\SID Research\models\DeepCA\datasets\CCTA_BP'       # TODO: change this to the path of the data
 
 # Create output directories if they don't exist
 os.makedirs(os.path.join(output_dir, 'outputs_results/checkpoints'), exist_ok=True)
 
 # Get dataset parameters
-SAMPLES_PARA = get_samples_parameters(data_path)
+SAMPLES_PARA = get_samples_parameters(label_dir)
 
-LEARNING_RATE = 1e-4
-MAX_EPOCHS = 200
-BATCH_SIZE = 3
+LEARNING_RATE = 1e-5
+MAX_EPOCHS = 15
+BATCH_SIZE = 1
 
 def set_random_seed(seed, deterministic=True):
     """Set random seed.
@@ -111,6 +111,8 @@ def do_evaluation(dataloader, model, device, discriminator):
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+    
+    # Initialize models
     model = Generator(in_channels=1, num_filters=64, class_num=1).to(device)
     discriminator = Discriminator(device, 2).to(device)
 
@@ -120,13 +122,13 @@ def main():
     batch_size = BATCH_SIZE
 
     #Dataset setup
-    training_set = Dataset(data_path, SAMPLES_PARA['train_index'])
+    training_set = Dataset(BP_dir, label_dir, SAMPLES_PARA['train_index'], linux=False)
     trainloader = torch.utils.data.DataLoader(training_set, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True, pin_memory=True)
 
-    val_set = Dataset(data_path, SAMPLES_PARA['validation_index'])
+    val_set = Dataset(BP_dir, label_dir, SAMPLES_PARA['validation_index'], linux=False)
     validationloader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True, pin_memory=True)
 
-    test_set = Dataset(data_path, SAMPLES_PARA['test_index'])
+    test_set = Dataset(BP_dir, label_dir, SAMPLES_PARA['test_index'], linux=False)
     testloader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True, pin_memory=True)
 
     #G and D optimizer
@@ -257,8 +259,8 @@ def main():
             'Train_L1': f'{np.mean(l1_losses):.4f}'
         })
 
-        if (epoch + 1) % 1 == 0:
-            model.eval()
+        if validation_loss < best_validation_loss:
+
             torch.save(
                     {
                         "network": model.state_dict(),

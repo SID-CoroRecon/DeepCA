@@ -1,13 +1,16 @@
 from torch import nn
 from torch import cat
 
-from CCT_3d import CCT
+try:
+      from .CCT_3d import CCT
+except:
+      from CCT_3d import CCT
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, batch_norm=True):
         super(ConvBlock, self).__init__()
 
-        insert_channels = out_channels #if in_channels > out_channels else out_channels // 2
+        insert_channels = out_channels
         layers = [
             nn.Conv3d(in_channels, insert_channels, 3, stride=1, padding='same'),
             nn.ReLU(True),
@@ -89,3 +92,19 @@ class Generator(nn.Module):
         out = self.conv_class(x)
 
         return out
+
+    def print_parameter_counts(self):
+        """Print the number of parameters in the model"""
+        total_params = sum(p.numel() for p in self.parameters())
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        non_trainable_params = total_params - trainable_params
+        
+        print("\nGenerator Parameter Counts:")
+        print(f"Total parameters: {total_params:,}")
+        print(f"Trainable parameters: {trainable_params:,}")
+        print(f"Non-trainable parameters: {non_trainable_params:,}")
+        print(f"Memory savings: {(non_trainable_params/total_params)*100:.2f}%")
+
+if __name__ == "__main__":
+    generator = Generator()
+    generator.print_parameter_counts()

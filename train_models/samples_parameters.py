@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-def get_samples_parameters(data_path, val_ratio=0.15, test_ratio=0.10, seed=1):
+def get_samples_parameters(label_dir, val_ratio=0.15, test_ratio=0.10, seed=1):
     """
     Generate sample parameters for dataset splitting.
     
@@ -26,7 +26,6 @@ def get_samples_parameters(data_path, val_ratio=0.15, test_ratio=0.10, seed=1):
     SAMPLES_PARA = {}
     
     # Get all file names and extract IDs
-    label_dir = os.path.join(data_path, 'split_two')
     all_files = os.listdir(label_dir)
     # Extract IDs from filenames (assuming format is "ID.npy")
     all_ids = [int(os.path.splitext(f)[0]) for f in all_files]
