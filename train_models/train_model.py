@@ -81,29 +81,6 @@ def generation_eval(outputs,labels):
 
     return l1_loss
 
-def calculate_dice(pred, target, smooth=1.0):
-    """Calculate DICE coefficient for 3D medical images.
-    
-    Args:
-        pred: Predicted segmentation mask (B, C, D, H, W)
-        target: Ground truth segmentation mask (B, C, D, H, W)
-        smooth: Smoothing factor to avoid division by zero
-        
-    Returns:
-        dice: DICE coefficient
-    """
-    # Apply sigmoid to get probabilities
-    pred = F.sigmoid(pred)
-    
-    # Convert to binary mask
-    pred = (pred > 0.5).float()
-    
-    # Calculate intersection and union
-    intersection = (pred * target).sum()
-    dice = (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
-    
-    return dice.item()
-
 
 def do_evaluation(dataloader, model, device, discriminator):
     model.eval()
@@ -111,7 +88,6 @@ def do_evaluation(dataloader, model, device, discriminator):
     
     l1_losses = []
     G_losses = []
-    dice_scores = []
     
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
@@ -127,11 +103,7 @@ def do_evaluation(dataloader, model, device, discriminator):
             l1_loss = generation_eval(outputs,labels)
             l1_losses.append(l1_loss.item())
             
-            # Calculate DICE score
-            dice_score = calculate_dice(outputs, labels)
-            dice_scores.append(dice_score)
-            
-    return np.mean(G_losses), np.mean(l1_losses), np.mean(dice_scores)
+    return np.mean(G_losses), np.mean(l1_losses)
 
 def load_checkpoint(model, discriminator, optimizer, D_optimizer, checkpoint_path):
     """Load model checkpoint if it exists.
@@ -189,7 +161,7 @@ def main():
                                     lr=1e-4, betas=(0.5, 0.9))
 
     # Try to load the latest checkpoint
-    checkpoint_dir = '/kaggle/input/deepca-training/outputs_results/checkpoints'
+    checkpoint_dir = '/kaggle/input/deepca-training-6/outputs_results/checkpoints'
     latest_checkpoint = None
     if os.path.exists(checkpoint_dir):
         checkpoints = [f for f in os.listdir(checkpoint_dir) if f.endswith('.tar')]
@@ -316,14 +288,14 @@ def main():
                 print(f'Batch {i+1}/{len(trainloader)} - G_loss: {G_loss.item():.4f}, D_loss: {D_loss.item():.4f}, L1_loss: {l1_loss.item():.4f}, Combined_loss: {combined_loss.item():.4f}')
 
         #do validation
-        G_loss_val, l1_loss_val, dice_val = do_evaluation(validationloader, model, device, discriminator)
+        G_loss_val, l1_loss_val = do_evaluation(validationloader, model, device, discriminator)
         combined_loss_val = G_loss_val + l1_loss_val*100
         validation_loss = l1_loss_val
 
         # Print epoch summary
         print(f'\nEpoch {epoch+1}/{start_epoch + EXTRA_EPOCHS} Summary:')
         print(f'Training - Avg G_loss: {np.mean(G_losses):.4f}, Avg D_loss: {np.mean(D_losses):.4f}, Avg L1_loss: {np.mean(l1_losses):.4f}')
-        print(f'Validation - G_loss: {G_loss_val:.4f}, L1_loss: {l1_loss_val:.4f}, Combined_loss: {combined_loss_val:.4f}, DICE: {dice_val:.4f}\n')
+        print(f'Validation - G_loss: {G_loss_val:.4f}, L1_loss: {l1_loss_val:.4f}, Combined_loss: {combined_loss_val:.4f}\n')
 
         if (epoch + 1) % 10 == 0:
             model.eval()
@@ -358,11 +330,11 @@ def main():
     print('\n############################### testing evaluation on best trained model so far')
     model.load_state_dict(best_model_state)
     discriminator.load_state_dict(best_D_model_state)
-    G_loss_test, l1_loss_test, dice_test = do_evaluation(testloader, model, device, discriminator)
+    G_loss_test, l1_loss_test = do_evaluation(testloader, model, device, discriminator)
     test_loss = G_loss_test + l1_loss_test*100
 
-    print('Testdataset Evaluation - test loss: {0:3.8f}, G loss: {1:3.8f}, l1 loss: {2:3.8f}, DICE: {3:3.8f}'
-                .format(test_loss, G_loss_test.item(), l1_loss_test.item(), dice_test))
+    print('Testdataset Evaluation - test loss: {0:3.8f}, G loss: {1:3.8f}, l1 loss: {2:3.8f}'
+                .format(test_loss, G_loss_test.item(), l1_loss_test.item()))
 
 if __name__ == '__main__':
     set_random_seed(1, False)
