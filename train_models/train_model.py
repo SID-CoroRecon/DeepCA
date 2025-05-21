@@ -176,12 +176,9 @@ def main():
     start_epoch = load_checkpoint(model, discriminator, optimizer, D_optimizer, latest_checkpoint) if latest_checkpoint else 0
 
     best_validation_loss = np.Inf
-
     best_model_state = None
     best_D_model_state = None
-
     early_stop_count_val = 0
-    num_critics = 2
 
     print("Starting training...")
 
@@ -199,6 +196,10 @@ def main():
         Wasserstein_Ds = []
         Wasserstein_Ds_cur = []
 
+        # Determine which batches to use for generator training in this epoch
+        # Alternate between even and odd batches each epoch
+        generator_batches = set(range(epoch % 2, len(trainloader), 2))
+        
         for i, data in enumerate(trainloader, 0):
             # Clear memory at the start of each batch
             gc.collect()
@@ -254,8 +255,8 @@ def main():
             torch.cuda.empty_cache()
 
             ###### generator loss
-            # Generator update
-            if (i+1) % num_critics == 0:
+            # Generator update - only on predetermined batches for this epoch
+            if i in generator_batches:
                 for p in discriminator.parameters():
                     p.requires_grad = False  # to avoid computation
                 for p in model.parameters():
@@ -287,6 +288,10 @@ def main():
                 # Print losses for this batch
                 print(f'Batch {i+1}/{len(trainloader)} - G_loss: {G_loss.item():.4f}, D_loss: {D_loss.item():.4f}, L1_loss: {l1_loss.item():.4f}, Combined_loss: {combined_loss.item():.4f}')
 
+        # Print generator training coverage for this epoch
+        print(f'Epoch {epoch+1}: Generator trained on {len(generator_batches)}/{len(trainloader)} batches')
+        print(f'Generator batches: {sorted(list(generator_batches))}')
+
         #do validation
         G_loss_val, l1_loss_val = do_evaluation(validationloader, model, device, discriminator)
         combined_loss_val = G_loss_val + l1_loss_val*100
@@ -297,7 +302,7 @@ def main():
         print(f'Training - Avg G_loss: {np.mean(G_losses):.4f}, Avg D_loss: {np.mean(D_losses):.4f}, Avg L1_loss: {np.mean(l1_losses):.4f}')
         print(f'Validation - G_loss: {G_loss_val:.4f}, L1_loss: {l1_loss_val:.4f}, Combined_loss: {combined_loss_val:.4f}\n')
 
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) == start_epoch + EXTRA_EPOCHS:
             model.eval()
             torch.save(
                     {
