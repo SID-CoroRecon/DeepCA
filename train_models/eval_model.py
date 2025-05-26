@@ -221,8 +221,11 @@ def main():
             inputs, labels = data[0].float().to(device), data[1].float().to(device)
             outputs = model(inputs)
 
-            outputs = outputs.cpu().numpy().astype(np.int8)
-            labels = labels.cpu().numpy().astype(np.int8)
+            outputs = outputs.cpu().numpy()
+            labels = labels.cpu().numpy()
+
+            print(f'Processing {i} / {len(testloader)} ...')
+            save_test_results(outputs, labels, f'{i}')
 
             # Compute Ot(d) for d=1 & d=2
             ot_1mm = compute_overlap_metric(labels, outputs, d=1)
@@ -236,9 +239,6 @@ def main():
             chamfer_distance_list.append(chamfer_distance)
 
             print(f"Sample {i}: Ot(1mm)={ot_1mm*100:.2f}, Ot(2mm)={ot_2mm*100:.2f}, CD(L2)={chamfer_distance:.2f}")
-
-            save_test_results(outputs, labels, f'{i}')
-            print(f'{i} / {len(testloader)} samples done')
     
     print(f"Ot(1mm): {np.mean(ot_1mm_list)*100:.2f}, Ot(2mm): {np.mean(ot_2mm_list)*100:.2f}, CD(L2): {np.mean(chamfer_distance_list):.2f}")
 
