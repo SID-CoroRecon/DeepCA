@@ -1,11 +1,11 @@
 import torch
-import torch.nn as nn
-import numpy as np
 import random
-import torch.nn.functional as F
-import torch.autograd as autograd
-from torch.autograd import Variable
+import numpy as np
 import os
+import torch.nn as nn
+import torch.nn.functional as F
+from skimage.measure import marching_cubes
+from stl import mesh as stl_mesh
 
 
 def set_random_seed(seed, deterministic=True):
@@ -20,31 +20,6 @@ def set_random_seed(seed, deterministic=True):
     if deterministic:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-
-
-def calculate_gradient_penalty(real_images, fake_images, discriminator, device, batch_size, lambda_term):
-    """
-    Calculate the gradient penalty for the discriminator.
-    """
-    eta = torch.FloatTensor(batch_size,2,1,1,1).uniform_(0,1).to(device)
-    eta = eta.expand(batch_size, real_images.size(1), real_images.size(2), real_images.size(3), real_images.size(4))
-
-    interpolated = eta * fake_images + ((1 - eta) * real_images)
-
-    # define it to calculate gradient
-    interpolated = Variable(interpolated, requires_grad=True)
-
-    # calculate probability of interpolated examples
-    prob_interpolated = discriminator(interpolated)
-
-    # calculate gradients of probabilities with respect to examples
-    gradients = autograd.grad(outputs=prob_interpolated, inputs=interpolated,
-                           grad_outputs=torch.ones(
-                               prob_interpolated.size()).to(device),
-                           create_graph=True, retain_graph=True)[0]
-
-    grad_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * lambda_term
-    return grad_penalty
 
 
 def generation_eval(outputs,labels):
@@ -105,3 +80,28 @@ def load_checkpoint(model, discriminator, optimizer, D_optimizer, checkpoint_pat
         print(f"Resuming training from epoch {start_epoch}")
         return start_epoch
     return 0
+
+def save_3d_model(volume, filename):
+    """Save 3D volume in multiple formats with robust error handling"""
+    try:
+        # Convert to numpy array if it's a tensor
+        if torch.is_tensor(volume):
+            volume = volume.squeeze().cpu().detach().numpy()
+        volume = volume.squeeze()
+        
+        threshold = 0.5
+        
+        # Create mesh using marching cubes
+        vertices, faces, _, _ = marching_cubes(volume, level=threshold)
+        
+        # Save as STL (most widely supported)
+        stl_mesh_obj = stl_mesh.Mesh(np.zeros(faces.shape[0], dtype=stl_mesh.Mesh.dtype))
+        for i, f in enumerate(faces):
+            for j in range(3):
+                stl_mesh_obj.vectors[i][j] = vertices[f[j]]
+        stl_mesh_obj.save(filename + '.stl')
+        
+        return True
+    except Exception as e:
+        print(f"3D model save failed: {str(e)}")
+        return False
