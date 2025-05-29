@@ -123,7 +123,7 @@ def CCTA_split(file_path, output_dir='/kaggle/working', show_plot=False):
         print('Failed to split for this data (size is more than 128): ' + file_number)
 
 
-def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working', show_plot=False, save_plot=False):
+def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working', one_view=False, show_plot=False, save_plot=False):
     # Create output directories if they don't exist
     if save_plot:
         os.makedirs(os.path.join(output_dir, 'CCTA_first_proj'), exist_ok=True)
@@ -136,10 +136,11 @@ def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working'
     geo.COR = 0  # Center-of-rotation offset (y-direction)
     geo.rotDetector = np.array([0, 0, 0])  # Detector rotation angles (degrees)
     geo.mode = "cone"  # Cone-beam CT geometry (vs. parallel-beam)
- 
+
+    ID = 0
     for file_name in tqdm(os.listdir(phantoms_dir)):
         # Extract file number from the filename
-        file_number = file_name.split('.')[0]  # This will get "1" from "1.npy"
+        label_number = file_name.split('.')[0]  # This will get "1" from "1.npy"
         
         geo.nDetector = np.array([512, 512])  # Detector resolution (px)
         d_spacing = 0.2779 + 0.001*np.random.rand()  # Pixel spacing (mm, randomized)
@@ -174,7 +175,7 @@ def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working'
             plt.show()
 
         if save_plot:
-            plt.savefig(output_dir + '/CCTA_first_proj/' + file_number + '.png')
+            plt.savefig(output_dir + '/CCTA_first_proj/' + label_number + '.png')
         
         imgSIRT = algs.sirt(projections, geo, angles, 1)  # Reconstruct using SIRT
         imgSIRT_one = imgSIRT > 0  # Binarize
@@ -201,7 +202,7 @@ def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working'
             plt.show()
 
         if save_plot:
-            plt.savefig(output_dir + '/CCTA_second_proj/' + file_number + '.png')
+            plt.savefig(output_dir + '/CCTA_second_proj/' + label_number + '.png')
         
         ## Reconstruct:
         geo.offOrigin = np.array([0, 0, 0])
@@ -210,10 +211,18 @@ def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working'
         imgSIRT = algs.sirt(projections, geo, angles, 1)  # Reconstruct again
         imgSIRT_two = imgSIRT > 0  # Binarize
 
-        recon = imgSIRT_one.astype(np.int8) + imgSIRT_two.astype(np.int8)  # Combine both reconstructions
-
-        np.save(output_dir + "/CCTA_BP/recon_" + file_number, recon.astype(np.int8))    # Save combined volume
-        print("save ill_posed: " + file_number)
+        if one_view:
+            recon_one = imgSIRT_one.astype(np.int8)
+            recon_two = imgSIRT_two.astype(np.int8)
+            np.save(output_dir + "/CCTA_BP/recon_"+ label_number + "_" + str(ID), recon_one.astype(np.int8))
+            ID += 1
+            np.save(output_dir + "/CCTA_BP/recon_"+ label_number + "_" + str(ID), recon_two.astype(np.int8))
+            ID += 1
+        else:
+            recon = imgSIRT_one.astype(np.int8) + imgSIRT_two.astype(np.int8)  # Combine both reconstructions
+            np.save(output_dir + "/CCTA_BP/recon_" + label_number + "_" + str(ID), recon.astype(np.int8))    # Save combined volume
+            ID += 1
+        print("save ill_posed: " + label_number)
 
         if show_plot:
             fig = plt.figure()

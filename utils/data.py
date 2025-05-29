@@ -20,12 +20,18 @@ class Dataset(Dataset):
             'Generates one sample of data'
             # Select sample
             ID = self.list_IDs[index]
-            if self.linux:
-                  BP_file = self.BP_path + '/recon_' + str(ID) + '.npy'
-                  GT_file = self.GT_path + '/' + str(ID) + '.npy'
-            else:
-                  BP_file = self.BP_path + '\\recon_' + str(ID) + '.npy'
-                  GT_file = self.GT_path + '\\' + str(ID) + '.npy'
+            
+            # Find BP file by searching for files containing the ID
+            bp_files = [f for f in os.listdir(self.BP_path) if f.endswith(f"_{str(ID)}.npy")]
+            if not bp_files:
+                raise FileNotFoundError(f"No BP file found for ID {ID}")
+            BP_file = os.path.join(self.BP_path, bp_files[0])
+            
+            # Extract label number from BP filename (format: recon_label_number_ID.npy)
+            parts = BP_file.replace('.npy', '').split('_')
+            label_number = int(parts[-2])
+            GT_file = os.path.join(self.GT_path, f"{label_number}.npy")
+            
             # Load data and get label
             BP = np.transpose(np.load(BP_file)[:,:,:,np.newaxis])
             GT = np.transpose(np.load(GT_file)[:,:,:,np.newaxis])
@@ -33,9 +39,9 @@ class Dataset(Dataset):
             return torch.from_numpy(BP), torch.from_numpy(GT)
       
 
-def get_samples_parameters(label_dir, val_ratio=0.15, test_ratio=0.10, seed=1):
+def get_samples_parameters(BP_dir, val_ratio=0.15, test_ratio=0.10):
     """
-    Generate sample parameters for dataset splitting.
+    Generate sample parameters for dataset splitting using sequential ordering.
     
     Args:
         data_path (str): Path to the dataset directory
@@ -53,42 +59,24 @@ def get_samples_parameters(label_dir, val_ratio=0.15, test_ratio=0.10, seed=1):
             - num_validation_data: Number of validation samples
             - num_test_data: Number of test samples
     """
-    np.random.seed(seed)
-    
     SAMPLES_PARA = {}
     
     # Get all file names and extract IDs
-    all_files = os.listdir(label_dir)
-    # Extract IDs from filenames (assuming format is "ID.npy")
-    all_ids = [int(os.path.splitext(f)[0]) for f in all_files]
+    all_files = os.listdir(BP_dir)
+    # Extract IDs from filenames (assuming format is "ID.npy" or "recon_*_ID.npy")
+    all_ids = [int(''.join(filter(str.isdigit, os.path.splitext(f)[0].split('_')[-1]))) for f in all_files]
     all_ids.sort()  # Sort IDs to ensure consistent ordering
     
     SAMPLES_PARA['num_phantoms'] = len(all_ids)
     
     # Calculate split sizes
-    val_test_size = int(SAMPLES_PARA['num_phantoms'] * (val_ratio + test_ratio))
+    train_size = int(SAMPLES_PARA['num_phantoms'] * (1 - val_ratio - test_ratio))
     val_size = int(SAMPLES_PARA['num_phantoms'] * val_ratio)
-    test_size = int(SAMPLES_PARA['num_phantoms'] * test_ratio)
     
-    # Generate random indices for validation and test
-    random_indices = np.random.choice(
-        len(all_ids),
-        val_test_size,
-        False
-    ).tolist()
-    
-    # Split into validation and test
-    val_indices = random_indices[:val_size]
-    test_indices = random_indices[val_size:val_size + test_size]
-    
-    # Get actual IDs for each split
-    SAMPLES_PARA['validation_index'] = [all_ids[i] for i in val_indices]
-    SAMPLES_PARA['test_index'] = [all_ids[i] for i in test_indices]
-    
-    # Get training indices (remaining indices)
-    train_indices = [i for i in range(len(all_ids)) 
-                    if i not in val_indices and i not in test_indices]
-    SAMPLES_PARA['train_index'] = [all_ids[i] for i in train_indices]
+    # Split data sequentially
+    SAMPLES_PARA['train_index'] = all_ids[:train_size]
+    SAMPLES_PARA['validation_index'] = all_ids[train_size:train_size + val_size]
+    SAMPLES_PARA['test_index'] = all_ids[train_size + val_size:]
     
     # Calculate sizes
     SAMPLES_PARA['num_train_data'] = len(SAMPLES_PARA['train_index'])
