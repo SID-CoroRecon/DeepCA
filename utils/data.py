@@ -100,7 +100,7 @@ def get_data_loader(BP_path, GT_path, batch_size, linux=True):
     Returns:
         torch.utils.data.DataLoader: DataLoader for the dataset
     """
-    SAMPLES_PARA = get_samples_parameters(GT_path)
+    SAMPLES_PARA = get_samples_parameters(BP_path)
     train_dataset = Dataset(BP_path, GT_path, SAMPLES_PARA['train_index'], linux)
     val_dataset = Dataset(BP_path, GT_path, SAMPLES_PARA['validation_index'], linux)
     test_dataset = Dataset(BP_path, GT_path, SAMPLES_PARA['test_index'], linux)

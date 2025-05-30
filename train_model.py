@@ -6,7 +6,7 @@ import sys
 import yaml
 
 def load_config():
-    with open('config/config.yaml', 'r') as file:
+    with open('/kaggle/working/DeepCA/config/config.yaml', 'r') as file:
         config = yaml.safe_load(file)
     return config
 config = load_config()
@@ -50,7 +50,7 @@ def main():
     D_optimizer = optim.Adam(discriminator.parameters(), lr=LEARNING_RATE, betas=BETAS)
 
     print("Loading checkpoint...")
-    checkpoint_path = config['path']['checkpoint_dir'] + '/Epoch_198.tar'
+    checkpoint_path = config['path']['checkpoint_path']
     start_epoch = load_checkpoint(model, discriminator, optimizer, D_optimizer, checkpoint_path)
 
     print("Starting training...")
@@ -155,8 +155,8 @@ def main():
                 Wasserstein_Ds_cur = []
 
                 # Print losses for this batch
-                print(f'Batch {i+1}/{len(train_loader)} - G_loss: {G_loss.item():.4f}, D_loss: {D_loss.item():.4f}, 
-                      L1_loss: {l1_loss.item():.4f}, Combined_loss: {combined_loss.item():.4f}')
+                print(f'Batch {i+1}/{len(train_loader)} - G_loss: {G_loss.item():.4f}, D_loss: {D_loss.item():.4f}, '
+                      f'L1_loss: {l1_loss.item():.4f}, Combined_loss: {combined_loss.item():.4f}')
 
         # Print generator training coverage for this epoch
         print(f'Epoch {epoch+1}: Generator trained on {len(generator_batches)}/{len(train_loader)} batches')

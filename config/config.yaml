@@ -1,13 +1,13 @@
 path:
-  BP_dir: /kaggle/input/deepca-preprocessed-dataset/data/CCTA_BP
-  label_dir: /kaggle/input/deepca-preprocessed-dataset/data/split_two
-  output_dir: /kaggle/working
-  checkpoint_dir: /kaggle/input/deepca-training-18/outputs_results/checkpoints
+  BP_dir: /kaggle/input/deepca-one-view-data/CCTA_BP
+  label_dir: /kaggle/input/deepca-one-view-data/split_two
+  output_dir: /kaggle/working/DeepCA
+  checkpoint_path: /kaggle/input/deepca-training-18/outputs_results/checkpoints/Epoch_198.tar
   model_dir: /kaggle/working/DeepCA
 
 hyperparameters:
   learning_rate: 0.0001
-  extra_epochs: 10
+  extra_epochs: 5
   lambda_term: 10
   batch_size: 1
   betas:
