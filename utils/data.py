@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.distributed import DistributedSampler
 
 class Dataset(Dataset):
       'Characterizes a dataset for PyTorch'
@@ -86,30 +87,67 @@ def get_samples_parameters(BP_dir, val_ratio=0.15, test_ratio=0.10):
     return SAMPLES_PARA
 
 
-def get_data_loader(BP_path, GT_path, batch_size, linux=True):
+def get_data_loader(BP_path, GT_path, batch_size, linux=True, rank=None, world_size=None):
     """
-    Create a DataLoader for the dataset.
+    Create a DataLoader for the dataset with distributed training support.
     
     Args:
         BP_path (str): Path to the BP data
         GT_path (str): Path to the GT data
-        list_IDs (list): List of IDs for the dataset    
         batch_size (int): Batch size for the DataLoader
         linux (bool): Whether the system is Linux (default: True)
+        rank (int): Rank of the current process
+        world_size (int): Total number of processes
     
     Returns:
-        torch.utils.data.DataLoader: DataLoader for the dataset
+        tuple: (train_loader, val_loader, test_loader)
     """
     SAMPLES_PARA = get_samples_parameters(BP_path)
     train_dataset = Dataset(BP_path, GT_path, SAMPLES_PARA['train_index'], linux)
     val_dataset = Dataset(BP_path, GT_path, SAMPLES_PARA['validation_index'], linux)
     test_dataset = Dataset(BP_path, GT_path, SAMPLES_PARA['test_index'], linux)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
-                              num_workers=4, drop_last=True, pin_memory=True, persistent_workers=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, 
-                            num_workers=4, drop_last=True, pin_memory=True, persistent_workers=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, 
-                             num_workers=4, drop_last=True, pin_memory=True, persistent_workers=True)
+    # Create distributed samplers if rank and world_size are provided
+    if rank is not None and world_size is not None:
+        train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
+        val_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank)
+        test_sampler = DistributedSampler(test_dataset, num_replicas=world_size, rank=rank)
+    else:
+        train_sampler = None
+        val_sampler = None
+        test_sampler = None
+
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=batch_size,
+        shuffle=(train_sampler is None),
+        sampler=train_sampler,
+        num_workers=4,
+        drop_last=True,
+        pin_memory=True,
+        persistent_workers=True
+    )
+    
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=(val_sampler is None),
+        sampler=val_sampler,
+        num_workers=4,
+        drop_last=True,
+        pin_memory=True,
+        persistent_workers=True
+    )
+    
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=(test_sampler is None),
+        sampler=test_sampler,
+        num_workers=4,
+        drop_last=True,
+        pin_memory=True,
+        persistent_workers=True
+    )
 
     return train_loader, val_loader, test_loader
