@@ -45,18 +45,17 @@ def cleanup():
 
 def ddp_main(rank, world_size):
     setup(rank, world_size)
-
     device = torch.device(f'cuda:{rank}' if torch.cuda.is_available() else 'cpu') 
+
     model = Generator(in_channels=1, num_filters=64, class_num=1).to(device)
     discriminator = Discriminator(device, 2).to(device)
 
     model = DDP(model, device_ids=[rank] if torch.cuda.is_available() else None, find_unused_parameters=True)
     discriminator = DDP(discriminator, device_ids=[rank] if torch.cuda.is_available() else None, find_unused_parameters=True)
 
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    train_loader, val_loader, test_loader = get_data_loader(BP_dir, label_dir, BATCH_SIZE, rank=rank, world_size=world_size)
+    train_loader, val_loader, test_loader = get_data_loader(
+        BP_dir, label_dir, BATCH_SIZE, rank=rank, world_size=world_size
+    )
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=BETAS)
     D_optimizer = optim.Adam(discriminator.parameters(), lr=LEARNING_RATE, betas=BETAS)
@@ -64,49 +63,48 @@ def ddp_main(rank, world_size):
     start_epoch = load_checkpoint(model.module, discriminator.module, optimizer, D_optimizer, CHECKPOINT_PATH)
 
     for epoch in range(start_epoch, start_epoch + EXTRA_EPOCHS):
-        # Set epoch for distributed sampler
-        train_loader.sampler.set_epoch(epoch)
-        val_loader.sampler.set_epoch(epoch)
-        
         gc.collect()
         torch.cuda.empty_cache()
 
+        train_loader.sampler.set_epoch(epoch)
+        val_loader.sampler.set_epoch(epoch)
+
         model.train()
         discriminator.train()
-        l1_losses, D_losses, G_losses, combined_losses = [], [], [], []
-        Wasserstein_Ds = []
+        l1_losses, D_losses, G_losses, combined_losses, Wasserstein_Ds = [], [], [], [], []
 
         generator_batches = set(range(epoch % 2, len(train_loader), 2))
-        
-        for i, data in enumerate(train_loader, 0):
-            gc.collect()
-            torch.cuda.empty_cache()
 
-            inputs, labels = data[0].float().to(device), data[1].float().to(device)
+        for i, data in enumerate(train_loader):
+            inputs, labels = data[0].float().to(device, non_blocking=True), data[1].float().to(device, non_blocking=True)
 
+            # === Train Discriminator ===
             for p in discriminator.parameters(): p.requires_grad = True
             for p in model.parameters(): p.requires_grad = False
 
             D_optimizer.zero_grad()
-            outputs = model(inputs)
+            with torch.no_grad():
+                outputs = model(inputs)
 
-            DX_score = discriminator(torch.cat((inputs, labels), 1)).mean()
-            DG_score = discriminator(torch.cat((inputs, outputs), 1).detach()).mean()
+            real_pair = torch.cat((inputs, labels), 1)
+            fake_pair = torch.cat((inputs, outputs), 1)
+
+            DX_score = discriminator(real_pair).mean()
+            DG_score = discriminator(fake_pair.detach()).mean()
 
             gradient_penalty = calculate_gradient_penalty(
-                torch.cat((inputs, labels), 1),
-                torch.cat((inputs, outputs), 1).detach(),
-                discriminator, device, BATCH_SIZE, LAMBDA_TERM)
-
+                real_pair, fake_pair.detach(), discriminator, device, BATCH_SIZE, LAMBDA_TERM
+            )
             D_loss = (DG_score - DX_score + gradient_penalty)
             Wasserstein_D = DX_score - DG_score
 
             D_loss.backward()
             D_optimizer.step()
 
-            D_losses.append(D_loss.detach().item())
-            Wasserstein_Ds.append(Wasserstein_D.detach().item())
+            D_losses.append(D_loss.item())
+            Wasserstein_Ds.append(Wasserstein_D.item())
 
+            # === Train Generator ===
             if i in generator_batches:
                 for p in discriminator.parameters(): p.requires_grad = False
                 for p in model.parameters(): p.requires_grad = True
@@ -114,7 +112,6 @@ def ddp_main(rank, world_size):
                 optimizer.zero_grad()
                 outputs = model(inputs)
                 DG_score = discriminator(torch.cat((inputs, outputs), 1)).mean()
-
                 G_loss = -DG_score
                 G_losses.append(G_loss.item())
 
@@ -132,15 +129,16 @@ def ddp_main(rank, world_size):
                       f'Combined_loss: {combined_loss.item():.4f}')
 
         if rank == 0:
-            print(f'[RANK 0] Epoch {epoch+1} Summary:')
-            print(f'Avg G_loss: {np.mean(G_losses):.4f}, Avg D_loss: {np.mean(D_losses):.4f}, '
+            print(f'[RANK 0] Epoch {epoch+1} Summary: '
+                  f'Avg G_loss: {np.mean(G_losses):.4f}, Avg D_loss: {np.mean(D_losses):.4f}, '
                   f'Avg L1_loss: {np.mean(l1_losses):.4f}')
 
         G_loss_val, l1_loss_val = do_evaluation(val_loader, model.module, device, discriminator.module)
         combined_loss_val = G_loss_val + l1_loss_val * 100
 
         if rank == 0:
-            print(f'[RANK 0] Validation - G_loss: {G_loss_val:.4f}, L1_loss: {l1_loss_val:.4f}, Combined_loss: {combined_loss_val:.4f}')
+            print(f'[RANK 0] Validation - G_loss: {G_loss_val:.4f}, '
+                  f'L1_loss: {l1_loss_val:.4f}, Combined_loss: {combined_loss_val:.4f}')
 
         if (epoch + 1) == start_epoch + EXTRA_EPOCHS and rank == 0:
             model.eval()
@@ -149,13 +147,13 @@ def ddp_main(rank, world_size):
                 "discriminator": discriminator.module.state_dict(),
                 "optimizer": optimizer.state_dict(),
                 "D_optimizer": D_optimizer.state_dict(),
-            }, output_dir + '/checkpoints/Epoch_' + str(epoch+1) + '.tar')
+            }, output_dir + f'/checkpoints/Epoch_{epoch+1}.tar')
 
     if rank == 0:
         print('[RANK 0] Evaluating on test set...')
         G_loss_test, l1_loss_test = do_evaluation(test_loader, model.module, device, discriminator.module)
         test_loss = G_loss_test + l1_loss_test * 100
-        print(f'Test loss: {test_loss:.4f}, G_loss: {G_loss_test:.4f}, l1_loss: {l1_loss_test:.4f}')
+        print(f'Test loss: {test_loss:.4f}, G_loss: {G_loss_test:.4f}, L1_loss: {l1_loss_test:.4f}')
 
     cleanup()
 

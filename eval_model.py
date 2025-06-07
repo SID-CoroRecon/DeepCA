@@ -53,7 +53,7 @@ def main():
     D_optimizer = optim.Adam(discriminator.parameters(), lr=LEARNING_RATE, betas=BETAS)
 
     print("Loading checkpoint...")
-    checkpoint_path = config['path']['checkpoint_dir'] + '/Epoch_198.tar'
+    checkpoint_path = config['path']['checkpoint_path']
     _ = load_checkpoint(model, discriminator, optimizer, D_optimizer, checkpoint_path)
 
     model.eval()
