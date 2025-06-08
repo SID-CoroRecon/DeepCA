@@ -138,12 +138,13 @@ def ddp_main(rank, world_size):
                   f'Avg G_loss: {np.mean(G_losses):.4f}, Avg D_loss: {np.mean(D_losses):.4f}, '
                   f'Avg L1_loss: {np.mean(l1_losses):.4f}')
 
-        G_loss_val, l1_loss_val = do_evaluation(val_loader, model.module, device, discriminator.module)
+        G_loss_val, l1_loss_val, ot_1_val, ot_2_val, CD_val = do_evaluation(val_loader, model.module, device, discriminator.module)
         combined_loss_val = G_loss_val + l1_loss_val * 100
 
         if rank == 0:
             print(f'[RANK 0] Validation - G_loss: {G_loss_val:.4f}, '
-                  f'L1_loss: {l1_loss_val:.4f}, Combined_loss: {combined_loss_val:.4f}')
+                  f'L1_loss: {l1_loss_val:.4f}, Combined_loss: {combined_loss_val:.4f}, '
+                  f'Ot(1mm): {ot_1_val:.2f}, Ot(2mm): {ot_2_val:.2f}, CD(L2): {CD_val:.2f}')
 
         if (epoch + 1) == start_epoch + EXTRA_EPOCHS and rank == 0:
             model.eval()
@@ -156,10 +157,11 @@ def ddp_main(rank, world_size):
 
     if rank == 0:
         print('[RANK 0] Evaluating on test set...')
-        G_loss_test, l1_loss_test = do_evaluation(test_loader, model.module, device, discriminator.module)
+        G_loss_test, l1_loss_test, ot_1_test, ot_2_test, CD_test = do_evaluation(test_loader, model.module, device, discriminator.module)
         test_loss = G_loss_test + l1_loss_test * 100
-        print(f'Test loss: {test_loss:.4f}, G_loss: {G_loss_test:.4f}, L1_loss: {l1_loss_test:.4f}')
-
+        print(f'Test loss: {test_loss:.4f}, G_loss: {G_loss_test:.4f}, L1_loss: {l1_loss_test:.4f}, '
+              f'Ot(1mm): {ot_1_test:.2f}, Ot(2mm): {ot_2_test:.2f}, CD(L2): {CD_test:.2f}')
+        
     cleanup()
 
 def run_ddp():

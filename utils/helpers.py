@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from skimage.measure import marching_cubes
 from stl import mesh as stl_mesh
 
+from utils.metrics import *
 
 def set_random_seed(seed, deterministic=True):
     """
@@ -37,6 +38,9 @@ def do_evaluation(dataloader, model, device, discriminator):
     
     l1_losses = []
     G_losses = []
+    ot_1mm_list = []
+    ot_2mm_list = []
+    chamfer_distance_list = []
     
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
@@ -51,8 +55,22 @@ def do_evaluation(dataloader, model, device, discriminator):
 
             l1_loss = generation_eval(outputs,labels)
             l1_losses.append(l1_loss.item())
-            
-    return np.mean(G_losses), np.mean(l1_losses)
+
+            labels = labels.cpu().numpy()
+            outputs = outputs.cpu().numpy()
+
+            # Compute Ot(d) for d=1 & d=2
+            ot_1mm = compute_overlap_metric(labels, outputs, d=1)
+            ot_2mm = compute_overlap_metric(labels, outputs, d=2)
+
+            # Compute Chamfer Distance
+            chamfer_distance = compute_chamfer_distance(labels, outputs)
+
+            ot_1mm_list.append(ot_1mm)
+            ot_2mm_list.append(ot_2mm)
+            chamfer_distance_list.append(chamfer_distance)
+
+    return np.mean(G_losses), np.mean(l1_losses), np.mean(ot_1mm_list)*100, np.mean(ot_2mm_list)*100, np.mean(chamfer_distance_list)
 
 
 def load_checkpoint(model, discriminator, optimizer, D_optimizer, checkpoint_path):
