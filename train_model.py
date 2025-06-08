@@ -1,4 +1,5 @@
 import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import sys
 import torch
 import torch.optim as optim
@@ -77,6 +78,9 @@ def ddp_main(rank, world_size):
         generator_batches = set(range(epoch % 2, len(train_loader), 2))
 
         for i, data in enumerate(train_loader):
+            gc.collect()
+            torch.cuda.empty_cache()
+
             inputs, labels = data[0].float().to(device, non_blocking=True), data[1].float().to(device, non_blocking=True)
 
             # === Train Discriminator ===
