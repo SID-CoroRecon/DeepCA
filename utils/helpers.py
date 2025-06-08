@@ -77,8 +77,8 @@ def load_checkpoint(model, discriminator, optimizer, D_optimizer, checkpoint_pat
         D_optimizer.load_state_dict(checkpoint['D_optimizer'])
         # Extract epoch number from checkpoint filename
         start_epoch = int(checkpoint_path.split('_')[-1].split('.')[0])
-        print(f"Resuming training from epoch {start_epoch}")
         return start_epoch
+    print("Training from scratch")
     return 0
 
 def save_3d_model(volume, filename):

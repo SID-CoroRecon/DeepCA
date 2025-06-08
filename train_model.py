@@ -61,6 +61,7 @@ def ddp_main(rank, world_size):
     D_optimizer = optim.Adam(discriminator.parameters(), lr=LEARNING_RATE, betas=BETAS)
 
     start_epoch = load_checkpoint(model.module, discriminator.module, optimizer, D_optimizer, CHECKPOINT_PATH)
+    print(f"Resuming training from epoch {start_epoch + 1} to {start_epoch + EXTRA_EPOCHS}")
 
     for epoch in range(start_epoch, start_epoch + EXTRA_EPOCHS):
         gc.collect()

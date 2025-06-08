@@ -6,12 +6,13 @@ from torch.utils.data.distributed import DistributedSampler
 
 class Dataset(Dataset):
       'Characterizes a dataset for PyTorch'
-      def __init__(self, BP_path, GT_path, list_IDs, linux=False):
+      def __init__(self, BP_path, GT_path, list_IDs, linux=False, one_view=False):
             'Initialization'
             self.list_IDs = list_IDs
             self.BP_path = BP_path
             self.GT_path = GT_path
             self.linux = linux
+            self.one_view = one_view
 
       def __len__(self):
             'Denotes the total number of samples'
@@ -30,7 +31,10 @@ class Dataset(Dataset):
             
             # Extract label number from BP filename (format: recon_label_number_ID.npy)
             parts = BP_file.replace('.npy', '').split('_')
-            label_number = int(parts[-2])
+            if self.one_view:
+                label_number = int(parts[-2])
+            else:
+                 label_number = int(parts[-1])
             GT_file = os.path.join(self.GT_path, f"{label_number}.npy")
             
             # Load data and get label
