@@ -168,14 +168,15 @@ def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working'
         projections = tigre.Ax(phantom.copy(), geo, angles) #array
         projections = projections > 0
 
-        if show_plot:   
+        if show_plot or save_plot:
             fig = plt.figure()
             ax = fig.add_subplot()
             ax.imshow(projections[0], cmap=plt.get_cmap('Greys'))
-            plt.show()
-
-        if save_plot:
-            plt.savefig(output_dir + '/CCTA_first_proj/' + label_number + '.png')
+            if save_plot:
+                plt.savefig(os.path.join(output_dir, 'CCTA_first_proj', f'{label_number}.png'))
+            if show_plot:
+                plt.show()
+            plt.close(fig)
         
         imgSIRT = algs.sirt(projections, geo, angles, 1)  # Reconstruct using SIRT
         imgSIRT_one = imgSIRT > 0  # Binarize
@@ -195,16 +196,17 @@ def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working'
         projections = tigre.Ax(phantom.copy(), geo, angles)  # Second projection
         projections = projections > 0  # Binarize
 
-        if show_plot:   
+        if show_plot or save_plot:
             fig = plt.figure()
             ax = fig.add_subplot()
             ax.imshow(projections[0], cmap=plt.get_cmap('Greys'))
-            plt.show()
-
-        if save_plot:
-            plt.savefig(output_dir + '/CCTA_second_proj/' + label_number + '.png')
+            if save_plot:
+                plt.savefig(os.path.join(output_dir, 'CCTA_second_proj', f'{label_number}.png'))
+            if show_plot:
+                plt.show()
+            plt.close(fig)
         
-        ## Reconstruct:
+        # Reconstruct:
         geo.offOrigin = np.array([0, 0, 0])
         angles = np.array([[angle_two_pri, angle_two_sec,0]])
         angles = angles/180*np.pi
@@ -232,19 +234,19 @@ def generate_deformed_projections_RCA(phantoms_dir, output_dir='/kaggle/working'
             plt.show()
 
 if __name__ == '__main__':
-    base_dir = '/kaggle/working/extracted_labels/'
+    base_dir = 'data/RAW_DATA'
     directories = ['1-200', '201-400', '401-600', '601-800', '801-1000']
-    
+
     for dir_name in tqdm(directories, desc="Processing directories"):
         current_dir = os.path.join(base_dir, dir_name)
         for file_name in tqdm(os.listdir(current_dir), desc=f"Processing files in {dir_name}", leave=False):
             if file_name.endswith('.label.nii.gz'):
                 file_path = os.path.join(current_dir, file_name)
-                CCTA_split(file_path)
+                CCTA_split(file_path, 'data')
     print("CCTA splits completed")
-    print("Number of files split: ", len(os.listdir('/kaggle/working/split_two/')))
+    print("Number of files split: ", len(os.listdir('data/split_two/')))
     
     # After all CCTA splits are done, run the projection generation
-    generate_deformed_projections_RCA('/kaggle/working/split_two/')  # path to the phantom images
+    generate_deformed_projections_RCA('data/split_two/', 'data', save_plot=True)  # path to the phantom images
     print("Projection generation completed")
-    print("Number of files projected: ", len(os.listdir('/kaggle/working/CCTA_BP/')))
+    print("Number of files projected: ", len(os.listdir('data/CCTA_BP/')))
