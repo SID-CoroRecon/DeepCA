@@ -2,7 +2,7 @@
 
 # 1. Overview
 
-This is the official code repository for the [DeepCA](https://arxiv.org/abs/2407.14616) paper by Yiying Wang, Abhirup Banerjee, Robin P. Choudhury and Vicente Grau, which has been early accepted to the **WACV 2025 (Oral) (early acceptance rate: 12.1%)**.
+This is the official code repository for the [DeepCA](https://arxiv.org/abs/2407.14616) paper by Yiying Wang, Abhirup Banerjee, Robin P. Choudhury and Vicente Grau, which has been early accepted to the **WACV 2025 (Oral) (WACV Broadening Participation Scholarship - Travel Award: Top 2\%) (early acceptance rate: 12.1%)**.
 
 ## Citation
 
