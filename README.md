@@ -9,11 +9,13 @@ This is the official code repository for the [DeepCA](https://arxiv.org/abs/2407
 If you find the code are useful, please consider citing the paper.
 
 ```
-@article{wang2024deep,
-  title={Deep Learning-based 3D Coronary Tree Reconstruction from Two 2D Non-simultaneous X-ray Angiography Projections},
+@inproceedings{wang2025deepca,
+  title={DeepCA: Deep Learning-Based 3D Coronary Artery Tree Reconstruction from Two 2D Non-Simultaneous X-Ray Angiography Projections},
   author={Wang, Yiying and Banerjee, Abhirup and Choudhury, Robin P and Grau, Vicente},
-  journal={arXiv preprint arXiv:2407.14616},
-  year={2024}
+  booktitle={2025 IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+  pages={337--346},
+  year={2025},
+  organization={IEEE}
 }
 ```
 
