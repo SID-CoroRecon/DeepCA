@@ -42,10 +42,13 @@ def do_evaluation(dataloader, model, device, discriminator):
     ot_2mm_list = []
     chamfer_distance_list = []
     
+    # Create pred_models directory if it doesn't exist
+    os.makedirs('pred_models', exist_ok=True)
+    
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
         for data in dataloader:
-            inputs, labels = data[0].float().to(device), data[1].float().to(device)
+            inputs, labels, model_ids = data[0].float().to(device), data[1].float().to(device), data[2]
             # calculate outputs by running images through the network
             outputs = model(inputs)
 
@@ -69,6 +72,12 @@ def do_evaluation(dataloader, model, device, discriminator):
             ot_1mm_list.append(ot_1mm)
             ot_2mm_list.append(ot_2mm)
             chamfer_distance_list.append(chamfer_distance)
+            
+            # Save predicted models
+            for i in range(outputs.shape[0]):
+                model_no = model_ids[i].item() if torch.is_tensor(model_ids[i]) else model_ids[i]
+                output_file = f'pred_models/recon_occupancy_{model_no}_deepca.npy'
+                np.save(output_file, outputs[i])
 
     return np.mean(G_losses), np.mean(l1_losses), np.mean(ot_1mm_list)*100, np.mean(ot_2mm_list)*100, np.mean(chamfer_distance_list)
 

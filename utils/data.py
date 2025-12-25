@@ -41,7 +41,7 @@ class Dataset(Dataset):
             BP = np.transpose(np.load(BP_file)[:,:,:,np.newaxis])
             GT = np.transpose(np.load(GT_file)[:,:,:,np.newaxis])
 
-            return torch.from_numpy(BP), torch.from_numpy(GT)
+            return torch.from_numpy(BP), torch.from_numpy(GT), ID
       
 
 def get_samples_parameters(BP_dir):
