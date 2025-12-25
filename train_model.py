@@ -54,7 +54,7 @@ def ddp_main(rank, world_size):
     model = DDP(model, device_ids=[rank] if torch.cuda.is_available() else None, find_unused_parameters=True)
     discriminator = DDP(discriminator, device_ids=[rank] if torch.cuda.is_available() else None, find_unused_parameters=True)
 
-    train_loader, val_loader, test_loader = get_data_loader(
+    train_loader, test_loader = get_data_loader(
         BP_dir, label_dir, BATCH_SIZE, rank=rank, world_size=world_size
     )
 
@@ -69,7 +69,6 @@ def ddp_main(rank, world_size):
         torch.cuda.empty_cache()
 
         train_loader.sampler.set_epoch(epoch)
-        val_loader.sampler.set_epoch(epoch)
 
         model.train()
         discriminator.train()
@@ -137,14 +136,6 @@ def ddp_main(rank, world_size):
             print(f'[RANK 0] Epoch {epoch+1} Summary: '
                   f'Avg G_loss: {np.mean(G_losses):.4f}, Avg D_loss: {np.mean(D_losses):.4f}, '
                   f'Avg L1_loss: {np.mean(l1_losses):.4f}')
-
-        G_loss_val, l1_loss_val, ot_1_val, ot_2_val, CD_val = do_evaluation(val_loader, model.module, device, discriminator.module)
-        combined_loss_val = G_loss_val + l1_loss_val * 100
-
-        if rank == 0:
-            print(f'[RANK 0] Validation - G_loss: {G_loss_val:.4f}, '
-                  f'L1_loss: {l1_loss_val:.4f}, Combined_loss: {combined_loss_val:.4f}, '
-                  f'Ot(1mm): {ot_1_val:.2f}, Ot(2mm): {ot_2_val:.2f}, CD(L2): {CD_val:.2f}')
 
         if (epoch + 1) == start_epoch + EXTRA_EPOCHS and rank == 0:
             model.eval()
